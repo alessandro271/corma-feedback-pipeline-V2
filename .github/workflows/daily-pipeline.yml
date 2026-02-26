@@ -1,0 +1,46 @@
+name: Daily Feedback Pipeline
+
+on:
+  schedule:
+    # Run every day at 7:00 AM Paris time (6:00 AM UTC in winter, 5:00 AM UTC in summer)
+    # Using 6:00 AM UTC as a good default
+    - cron: "0 6 * * *"
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily pipeline
+        env:
+          LEEXI_API_KEY_ID: ${{ secrets.LEEXI_API_KEY_ID }}
+          LEEXI_API_KEY_SECRET: ${{ secrets.LEEXI_API_KEY_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_WEEKLY_PARENT_PAGE_ID: ${{ secrets.NOTION_WEEKLY_PARENT_PAGE_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEEKLY_WEBHOOK_URL: ${{ secrets.SLACK_WEEKLY_WEBHOOK_URL }}
+        run: python main.py --verbose
+
+      - name: Upload log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-log-${{ github.run_number }}
+          path: pipeline.log
+          retention-days: 30
