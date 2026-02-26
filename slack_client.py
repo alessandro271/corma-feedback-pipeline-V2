@@ -143,7 +143,7 @@ class SlackClient:
         week_label: str,
         total_calls_with_feedback: int,
         total_feedback_items: int,
-        top_features: list[str],
+        top_features: list[dict | str],
         mrr_details: list[dict],
         total_mrr: str | None,
     ) -> bool:
@@ -153,8 +153,8 @@ class SlackClient:
             week_label: Week identifier (e.g. "2026-W08").
             total_calls_with_feedback: Number of calls where feedback was found.
             total_feedback_items: Total number of feedback items created.
-            top_features: List of top feature/request titles.
-            mrr_details: List of dicts with keys: company, mrr.
+            top_features: List of dicts with keys: title, company, mrr (or plain strings).
+            mrr_details: List of dicts with keys: company, mrr (deduped by company).
             total_mrr: Aggregated MRR string if computable.
         """
         blocks: list[dict] = [
@@ -182,7 +182,23 @@ class SlackClient:
         ]
 
         if top_features:
-            feature_list = "\n".join(f"• {f}" for f in top_features[:10])
+            lines: list[str] = []
+            for f in top_features[:10]:
+                if isinstance(f, dict):
+                    title = f.get("title", "")
+                    company = f.get("company", "")
+                    mrr = f.get("mrr", "")
+                    # Build parenthetical: (Company — MRR) or (Company) or just title
+                    parts = []
+                    if company and company != "Unknown":
+                        parts.append(company)
+                    if mrr:
+                        parts.append(mrr)
+                    suffix = f" ({' — '.join(parts)})" if parts else ""
+                    lines.append(f"• {title}{suffix}")
+                else:
+                    lines.append(f"• {f}")
+            feature_list = "\n".join(lines)
             blocks.append({"type": "divider"})
             blocks.append(
                 {

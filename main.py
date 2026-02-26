@@ -179,8 +179,8 @@ def run_weekly_digest(args, logger) -> None:
         return
 
     # Aggregate data from Notion pages
-    feedback_titles: list[str] = []
-    mrr_details: list[dict] = []
+    feedback_entries: list[dict] = []  # {title, company, mrr}
+    mrr_by_company: dict[str, str] = {}  # dedupe MRR by company
     call_urls: set[str] = set()
 
     for page in pages:
@@ -188,8 +188,7 @@ def run_weekly_digest(args, logger) -> None:
 
         # Feedback title
         title_prop = props.get("Feedback Title", {}).get("title", [])
-        if title_prop:
-            feedback_titles.append(title_prop[0].get("plain_text", ""))
+        title = title_prop[0].get("plain_text", "") if title_prop else ""
 
         # Company
         company_prop = props.get("Customer / Company", {}).get("rich_text", [])
@@ -198,17 +197,32 @@ def run_weekly_digest(args, logger) -> None:
         # MRR
         mrr_prop = props.get("MRR Potential", {}).get("rich_text", [])
         mrr = mrr_prop[0].get("plain_text", "") if mrr_prop else ""
+
+        # Build enriched feedback entry
+        if title:
+            feedback_entries.append({
+                "title": title,
+                "company": company or "Unknown",
+                "mrr": mrr or "",
+            })
+
+        # Dedupe MRR by company (keep first occurrence)
         if mrr:
-            mrr_details.append({"company": company or "Unknown", "mrr": mrr})
+            company_key = company or "Unknown"
+            if company_key not in mrr_by_company:
+                mrr_by_company[company_key] = mrr
 
         # Count unique calls
         url_prop = props.get("Source Call URL", {}).get("url")
         if url_prop:
             call_urls.add(url_prop)
 
+    # Build deduped MRR details list
+    mrr_details = [{"company": c, "mrr": m} for c, m in mrr_by_company.items()]
+
     logger.info(
         f"Digest: {len(pages)} feedback items from {len(call_urls)} calls, "
-        f"{len(mrr_details)} with MRR data"
+        f"{len(mrr_details)} companies with MRR data"
     )
 
     if slack:
@@ -216,7 +230,7 @@ def run_weekly_digest(args, logger) -> None:
             week_label=week_label,
             total_calls_with_feedback=len(call_urls),
             total_feedback_items=len(pages),
-            top_features=feedback_titles[:10],
+            top_features=feedback_entries[:10],
             mrr_details=mrr_details,
             total_mrr=None,
         )
