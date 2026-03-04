@@ -93,6 +93,12 @@ class CallAnalysisResult(BaseModel):
     potential_mrr: Optional[str] = Field(
         default=None, description="Potential MRR if mentioned (e.g. '480 EUR')"
     )
+    company_size: Optional[str] = Field(
+        default=None, description="Number of users/employees (e.g. '150 users')"
+    )
+    company_domain: Optional[str] = Field(
+        default=None, description="Company domain (e.g. 'smart-trade.net')"
+    )
     deal_stage: Optional[str] = Field(
         default=None, description="Deal stage if identifiable (e.g. 'Discovery', 'Negotiation')"
     )

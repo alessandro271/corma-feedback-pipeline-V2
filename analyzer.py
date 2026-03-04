@@ -50,6 +50,8 @@ the transcript to:
    - Extract an exact verbatim quote from the CUSTOMER (not the Corma rep)
 6. Extract any ADDITIONAL specific product gaps from the transcript that the pre-extraction missed.
 7. Extract the potential MRR value and company info from the pre-extracted output header.
+8. Extract the company size (number of users) and company domain (e.g. "smart-trade.net") \
+from the pre-extracted output header if available.
 
 CRITICAL RULES — What to INCLUDE vs EXCLUDE:
 
@@ -109,7 +111,11 @@ the transcript.
 - If the transcript is unclear or too short, use the pre-extracted feedback as-is \
 and note limitations in call_summary.
 - Include the potential_mrr field (e.g. "480 EUR") if MRR information is found \
-in the pre-extracted output header.\
+in the pre-extracted output header.
+- Include company_size (e.g. "150 users", "50") if the number of users or employees is found \
+in the pre-extracted output.
+- Include company_domain (e.g. "smart-trade.net") if a domain is found \
+in the pre-extracted output.\
 """
 
 CALL_ANALYSIS_SCHEMA = {
@@ -173,6 +179,8 @@ CALL_ANALYSIS_SCHEMA = {
             },
         },
         "potential_mrr": {"type": ["string", "null"]},
+        "company_size": {"type": ["string", "null"]},
+        "company_domain": {"type": ["string", "null"]},
         "deal_stage": {"type": ["string", "null"]},
     },
     "required": [
@@ -424,13 +432,24 @@ def _normalize_response(data: dict) -> dict:
         data["potential_mrr"] = data.pop("mrr", data.pop("potential_revenue",
                                   data.pop("estimated_mrr", data.pop("mrr_potential", None))))
 
+    # Ensure company_size exists
+    if "company_size" not in data:
+        data["company_size"] = data.pop("size", data.pop("number_of_users",
+                                  data.pop("users", data.pop("employee_count", None))))
+
+    # Ensure company_domain exists
+    if "company_domain" not in data:
+        data["company_domain"] = data.pop("domain", data.pop("customer_domain",
+                                    data.pop("website", None)))
+
     # Ensure deal_stage exists
     if "deal_stage" not in data:
         data["deal_stage"] = data.pop("stage", data.pop("deal_status", None))
 
     # Remove unexpected top-level keys to avoid Pydantic errors
     allowed_top = {"call_type", "is_external_call", "corma_participants", "customer_participants",
-                   "customer_company", "call_summary", "feedback_items", "potential_mrr", "deal_stage"}
+                   "customer_company", "call_summary", "feedback_items", "potential_mrr",
+                   "company_size", "company_domain", "deal_stage"}
     data = {k: v for k, v in data.items() if k in allowed_top}
 
     return data

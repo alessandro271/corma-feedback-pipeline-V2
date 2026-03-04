@@ -345,7 +345,9 @@ def run_daily_pipeline(args, logger) -> None:
             logger.info(
                 f"  Call type: {result.call_type} | "
                 f"Feedback items: {len(result.feedback_items)} | "
-                f"MRR: {result.potential_mrr or 'N/A'}"
+                f"MRR: {result.potential_mrr or 'N/A'} | "
+                f"Size: {result.company_size or 'N/A'} | "
+                f"Domain: {result.company_domain or 'N/A'}"
             )
 
             if args.dry_run:
@@ -404,6 +406,8 @@ def run_daily_pipeline(args, logger) -> None:
                     ],
                     potential_mrr=result.potential_mrr,
                     leexi_url=call.leexi_url,
+                    company_size=result.company_size,
+                    company_domain=result.company_domain,
                 )
                 if success:
                     stats["slack_notifications_sent"] += 1

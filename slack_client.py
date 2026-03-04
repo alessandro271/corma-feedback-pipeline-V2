@@ -52,6 +52,8 @@ class SlackClient:
         feedback_items: list[dict],
         potential_mrr: str | None,
         leexi_url: str | None,
+        company_size: str | None = None,
+        company_domain: str | None = None,
     ) -> bool:
         """Send a per-call feedback notification to Slack.
 
@@ -85,7 +87,9 @@ class SlackClient:
                     {"type": "mrkdwn", "text": f"*Date:* {call_date}"},
                     {"type": "mrkdwn", "text": f"*Type:* {call_type}"},
                     {"type": "mrkdwn", "text": f"*Corma Contact:* {contacts_display}"},
-                ],
+                ]
+                + ([{"type": "mrkdwn", "text": f"*Size:* {company_size}"}] if company_size else [])
+                + ([{"type": "mrkdwn", "text": f"*Domain:* {company_domain}"}] if company_domain else []),
             },
         ]
 
