@@ -432,11 +432,14 @@ def sync_to_linear(
                     logger.info(f"  Found existing customer: {company}")
                 else:
                     # Create new customer card
+                    call_type = call.leexi_call_type or result.call_type or "Other"
+                    customer_status = "Active" if call_type == "Customer Success" else "Prospect"
                     new_customer = linear.create_customer(
                         name=company,
                         domain=result.company_domain,
                         revenue=_parse_mrr(result.potential_mrr),
                         size=_parse_company_size(result.company_size),
+                        status=customer_status,
                     )
                     if new_customer:
                         customer_id = new_customer["id"]

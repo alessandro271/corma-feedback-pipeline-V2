@@ -155,6 +155,14 @@ mutation CustomerUpdate($id: String!, $input: CustomerUpdateInput!) {
 }
 """
 
+QUERY_CUSTOMER_STATUSES = """
+query CustomerStatuses {
+    customerStatuses {
+        nodes { id name }
+    }
+}
+"""
+
 MUTATION_CREATE_CUSTOMER_NEED = """
 mutation CustomerNeedCreate($input: CustomerNeedCreateInput!) {
     customerNeedCreate(input: $input) {
@@ -250,6 +258,7 @@ class LinearClient:
         self._backlog_state_id: str | None = None
         self._label_cache: dict[str, str] = {}  # name -> id
         self._all_customers: list[dict] | None = None
+        self._customer_status_cache: dict[str, str] = {}  # name -> id
 
     # ------------------------------------------------------------------
     # Core GraphQL helper
@@ -622,12 +631,25 @@ class LinearClient:
 
         return None
 
+    def get_customer_status_id(self, status_name: str) -> str | None:
+        """Resolve a customer status name (e.g. 'Active', 'Prospect') to its ID."""
+        if not self._customer_status_cache:
+            try:
+                result = self._graphql(QUERY_CUSTOMER_STATUSES, {})
+                for status in result.get("customerStatuses", {}).get("nodes", []):
+                    self._customer_status_cache[status["name"].lower()] = status["id"]
+            except Exception:
+                logger.warning("Failed to fetch customer statuses from Linear")
+                return None
+        return self._customer_status_cache.get(status_name.lower())
+
     def create_customer(
         self,
         name: str,
         domain: str | None = None,
         revenue: float | None = None,
         size: int | None = None,
+        status: str | None = None,
     ) -> dict | None:
         """Create a new customer card in Linear."""
         input_data: dict[str, Any] = {"name": name}
@@ -640,6 +662,10 @@ class LinearClient:
             input_data["revenue"] = int(revenue)
         if size is not None:
             input_data["size"] = int(size)
+        if status:
+            status_id = self.get_customer_status_id(status)
+            if status_id:
+                input_data["statusId"] = status_id
 
         result = self._graphql(MUTATION_CREATE_CUSTOMER, {"input": input_data})
         customer_data = result.get("customerCreate", {})
