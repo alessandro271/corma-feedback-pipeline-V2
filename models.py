@@ -66,6 +66,9 @@ class FeedbackItem(BaseModel):
     customer_name: Optional[str] = Field(
         default=None, description="Name of the customer/prospect speaker"
     )
+    notion_page_id: Optional[str] = Field(
+        default=None, description="Notion page ID after creation (for status updates)"
+    )
 
 
 class CallAnalysisResult(BaseModel):
@@ -102,3 +105,27 @@ class CallAnalysisResult(BaseModel):
     deal_stage: Optional[str] = Field(
         default=None, description="Deal stage if identifiable (e.g. 'Discovery', 'Negotiation')"
     )
+    slack_thread_ts: Optional[str] = Field(
+        default=None, description="Slack message timestamp for thread replies"
+    )
+
+
+class LinearSyncResult(BaseModel):
+    """Result of syncing a single feedback item to Linear."""
+    feedback_title: str
+    action: str = Field(
+        description="One of: created, customer_need_added, skipped, error"
+    )
+    issue_identifier: Optional[str] = Field(
+        default=None, description="Linear issue ID like 'ENG-123'"
+    )
+    issue_url: Optional[str] = Field(
+        default=None, description="URL to the Linear issue"
+    )
+    customer_id: Optional[str] = Field(
+        default=None, description="Linear customer ID if created/found"
+    )
+    customer_action: Optional[str] = Field(
+        default=None, description="One of: created, found, updated"
+    )
+    error_message: Optional[str] = None

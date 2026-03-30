@@ -216,6 +216,63 @@ class NotionClient:
         logger.info("Database schema updated")
 
     # ------------------------------------------------------------------
+    # Integrations catalogue (external database)
+    # ------------------------------------------------------------------
+
+    def fetch_integrations_database(self, database_id: str) -> str:
+        """Fetch all integration names from the Notion integrations catalogue database.
+
+        Reads all rows, extracts the title property of each row, and returns
+        a formatted text list suitable for Claude's product context.
+        """
+        all_names: list[str] = []
+        start_cursor: str | None = None
+
+        while True:
+            body: dict = {"page_size": 100}
+            if start_cursor:
+                body["start_cursor"] = start_cursor
+
+            data = self._request(
+                "POST", f"databases/{database_id}/query", json_body=body
+            )
+            for page in data.get("results", []):
+                props = page.get("properties", {})
+                # Try to find the title property (could be named anything)
+                for prop_name, prop_data in props.items():
+                    if prop_data.get("type") == "title":
+                        title_items = prop_data.get("title", [])
+                        if title_items:
+                            name = title_items[0].get("plain_text", "").strip()
+                            if name:
+                                all_names.append(name)
+                        break
+
+            if data.get("has_more") and data.get("next_cursor"):
+                start_cursor = data["next_cursor"]
+            else:
+                break
+
+        logger.info(
+            f"Fetched {len(all_names)} integrations from Notion catalogue"
+        )
+        if not all_names:
+            return ""
+        return "Corma currently integrates with:\n" + "\n".join(
+            f"- {name}" for name in sorted(all_names)
+        )
+
+    # ------------------------------------------------------------------
+    # Update entry status
+    # ------------------------------------------------------------------
+
+    def update_entry_status(self, page_id: str, status: str) -> None:
+        """Update the Status select property of a feedback page."""
+        body = {"properties": {"Status": {"select": {"name": status}}}}
+        self._request("PATCH", f"pages/{page_id}", json_body=body)
+        logger.debug(f"Updated page {page_id} status to '{status}'")
+
+    # ------------------------------------------------------------------
     # Create feedback entry
     # ------------------------------------------------------------------
 

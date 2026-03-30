@@ -115,7 +115,14 @@ in the pre-extracted output header.
 - Include company_size (e.g. "150 users", "50") if the number of users or employees is found \
 in the pre-extracted output.
 - Include company_domain (e.g. "smart-trade.net") if a domain is found \
-in the pre-extracted output.\
+in the pre-extracted output.
+
+You may also receive EXISTING PRODUCT CONTEXT showing features that are already \
+built, in development, or planned in Linear, as well as existing integrations from \
+the product catalogue. Use this to better filter out feedback about existing \
+capabilities. If the context shows a feature or integration already exists or is in \
+progress, do NOT include customer requests for that feature as feedback items unless \
+the customer is specifically requesting something beyond what's already described.\
 """
 
 CALL_ANALYSIS_SCHEMA = {
@@ -459,20 +466,27 @@ class TranscriptAnalyzer:
     def __init__(self) -> None:
         self.client = anthropic.Anthropic()
 
-    def analyze_call(self, call: CallMetadata) -> CallAnalysisResult | None:
+    def analyze_call(
+        self, call: CallMetadata, product_context: str | None = None
+    ) -> CallAnalysisResult | None:
         """Analyze a call transcript and return structured feedback."""
         if not call.transcript_text:
             return None
 
         if len(call.transcript_text) > MAX_TRANSCRIPT_CHARS:
-            return self._chunk_and_analyze(call)
+            return self._chunk_and_analyze(call, product_context)
 
-        return self._analyze_single(call, call.transcript_text)
+        return self._analyze_single(call, call.transcript_text, product_context)
 
     def _analyze_single(
-        self, call: CallMetadata, transcript_text: str
+        self,
+        call: CallMetadata,
+        transcript_text: str,
+        product_context: str | None = None,
     ) -> CallAnalysisResult | None:
-        user_message = self._build_user_message(call, transcript_text)
+        user_message = self._build_user_message(
+            call, transcript_text, product_context
+        )
 
         try:
             response = self.client.messages.create(
@@ -540,7 +554,9 @@ class TranscriptAnalyzer:
             )
             return None
 
-    def _chunk_and_analyze(self, call: CallMetadata) -> CallAnalysisResult | None:
+    def _chunk_and_analyze(
+        self, call: CallMetadata, product_context: str | None = None
+    ) -> CallAnalysisResult | None:
         """Split a long transcript into overlapping chunks and merge results."""
         transcript = call.transcript_text or ""
         chunk_size = 150_000
@@ -562,7 +578,7 @@ class TranscriptAnalyzer:
 
         for i, chunk in enumerate(chunks):
             logger.debug(f"Analyzing chunk {i + 1}/{len(chunks)} for call {call.uuid}")
-            result = self._analyze_single(call, chunk)
+            result = self._analyze_single(call, chunk, product_context)
             if result is None:
                 continue
             if first_result is None:
@@ -584,8 +600,67 @@ class TranscriptAnalyzer:
         first_result.feedback_items = unique_feedback
         return first_result
 
+    def pick_best_match(
+        self,
+        feedback_title: str,
+        feedback_description: str,
+        candidates: list[dict],
+    ) -> dict | None:
+        """Use Claude to pick the best matching Linear issue/project from candidates.
+
+        Returns the best match dict, or None if Claude says NONE match.
+        Falls back to the first candidate on failure.
+        """
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+
+        # Build a concise prompt for Claude
+        candidate_lines = []
+        for i, c in enumerate(candidates[:10], 1):
+            identifier = c.get("identifier", c.get("id", "?"))
+            name = c.get("title", c.get("name", "Unknown"))
+            state = c.get("state", {}).get("name", c.get("state", ""))
+            candidate_lines.append(f"{i}. {identifier}: {name} ({state})")
+
+        candidates_text = "\n".join(candidate_lines)
+
+        prompt = (
+            f"Given this product feedback:\n"
+            f"Title: {feedback_title}\n"
+            f"Description: {feedback_description}\n\n"
+            f"Which of these Linear items is the best match? "
+            f"Reply with ONLY the number (e.g. '1') or 'NONE' if none match.\n\n"
+            f"{candidates_text}"
+        )
+
+        try:
+            response = self.client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=32,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+            if text.upper() == "NONE":
+                return None
+            # Parse the number
+            match = re.search(r"\d+", text)
+            if match:
+                idx = int(match.group()) - 1
+                if 0 <= idx < len(candidates):
+                    return candidates[idx]
+        except Exception:
+            logger.warning("pick_best_match failed, falling back to first candidate")
+
+        return candidates[0]
+
     @staticmethod
-    def _build_user_message(call: CallMetadata, transcript_text: str) -> str:
+    def _build_user_message(
+        call: CallMetadata,
+        transcript_text: str,
+        product_context: str | None = None,
+    ) -> str:
         speaker_lines: list[str] = []
         for s in call.speakers:
             label = "CORMA TEAM" if s.is_corma_team else "EXTERNAL"
@@ -609,9 +684,23 @@ PRE-EXTRACTED FEEDBACK (from Leexi AI):
 
 """
 
+        # Build product context section
+        context_section = ""
+        if product_context:
+            context_section = f"""
+EXISTING PRODUCT CONTEXT (from internal systems):
+{product_context}
+
+IMPORTANT: Use the above context to filter out feedback about features or \
+integrations that already exist or are already being built. Only include feedback \
+about capabilities that are NOT listed above, unless the customer is requesting \
+something specifically beyond what's described.
+
+"""
+
         return f"""\
 Analyze the following sales call data from Corma.
-
+{context_section}\
 CALL METADATA:
 - Title: {call.title or "Untitled"}
 - Date: {call.performed_at or "Unknown"}
@@ -629,7 +718,9 @@ FULL TRANSCRIPT:
 
 Analyze this call. For each pre-extracted feedback point, check whether the Corma \
 rep already explained or demonstrated that capability during the call — if so, \
-EXCLUDE it. Only include feedback about features Corma does NOT currently have. \
+EXCLUDE it. Also cross-reference with the EXISTING PRODUCT CONTEXT above to \
+exclude feedback about features or integrations that already exist or are in \
+development. Only include feedback about features Corma does NOT currently have. \
 Be very specific: each feedback item should be a concrete feature or integration \
 that a product manager could turn into a ticket. Prefer an empty feedback_items \
 list over vague or already-existing features. If MRR information is available in \

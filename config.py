@@ -16,6 +16,8 @@ NOTION_WEEKLY_PARENT_PAGE_ID = os.environ.get("NOTION_WEEKLY_PARENT_PAGE_ID", ""
 # --- Slack ---
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 SLACK_WEEKLY_WEBHOOK_URL = os.environ.get("SLACK_WEEKLY_WEBHOOK_URL", "")
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
+SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
 
 # --- Leexi ---
 LEEXI_BASE_URL = "https://public-api.leexi.ai/v1"
@@ -27,10 +29,18 @@ FEEDBACK_PROMPT_TITLE = "product feedback prompt"
 NOTION_BASE_URL = "https://api.notion.com/v1"
 NOTION_API_VERSION = "2022-06-28"
 NOTION_MIN_REQUEST_INTERVAL = 0.34  # seconds, to stay under 3 req/sec
+NOTION_INTEGRATIONS_DB_ID = os.environ.get("NOTION_INTEGRATIONS_DB_ID", "")
+
+# --- Linear ---
+LINEAR_API_KEY = os.environ.get("LINEAR_API_KEY", "")
+LINEAR_TEAM_ID = os.environ.get("LINEAR_TEAM_ID", "")
+LINEAR_INTEGRATION_LABEL = os.environ.get("LINEAR_INTEGRATION_LABEL", "Integration")
+LINEAR_FEATURE_LABEL = os.environ.get("LINEAR_FEATURE_LABEL", "Feature")
 
 # --- Claude ---
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
 MAX_TRANSCRIPT_CHARS = 180_000
+MAX_CONTEXT_CHARS = 30_000
 
 # --- Pipeline ---
 DEFAULT_LOOKBACK_DAYS = 1  # Daily mode by default

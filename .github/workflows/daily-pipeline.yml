@@ -35,6 +35,11 @@ jobs:
           NOTION_WEEKLY_PARENT_PAGE_ID: ${{ secrets.NOTION_WEEKLY_PARENT_PAGE_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEEKLY_WEBHOOK_URL: ${{ secrets.SLACK_WEEKLY_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_TEAM_ID: ${{ secrets.LINEAR_TEAM_ID }}
+          NOTION_INTEGRATIONS_DB_ID: ${{ secrets.NOTION_INTEGRATIONS_DB_ID }}
         run: python main.py --verbose
 
       - name: Upload log artifact
