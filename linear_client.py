@@ -232,6 +232,26 @@ def _extract_search_terms(feedback_title: str) -> str:
     return title.strip()
 
 
+def _filter_by_title_relevance(
+    candidates: list[dict], search_terms: str
+) -> list[dict]:
+    """Keep only candidates whose title contains a significant search term.
+
+    Linear's searchIssues uses semantic matching that often returns unrelated
+    results (e.g. "RAMP" → "Akuiteo Integration"). This filter ensures at
+    least one keyword from the search terms appears in the candidate title.
+    """
+    if not search_terms:
+        return candidates
+    terms = [t for t in search_terms.lower().split() if len(t) >= 3]
+    if not terms:
+        return candidates
+    return [
+        c for c in candidates
+        if any(term in c.get("title", "").lower() for term in terms)
+    ]
+
+
 def _get_logo_url(domain: str | None) -> str | None:
     """Build a logo URL from the company domain.
 
@@ -393,16 +413,21 @@ class LinearClient:
 
         Returns a list of candidates (may be empty, one, or multiple).
         The caller should use Claude-assisted matching when len > 1.
+        Results are filtered by title relevance to avoid false matches
+        from Linear's semantic search.
         """
+        key_terms = _extract_search_terms(feedback_title)
+
         # Tier 1: Full-text search with complete title
         results = self.search_issues(feedback_title, limit=5)
+        results = _filter_by_title_relevance(results, key_terms)
         if results:
             return results
 
         # Tier 2: Extract key terms and search again
-        key_terms = _extract_search_terms(feedback_title)
         if key_terms and key_terms != feedback_title.lower():
             results = self.search_issues(key_terms, limit=5)
+            results = _filter_by_title_relevance(results, key_terms)
             if results:
                 return results
 
