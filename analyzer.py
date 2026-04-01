@@ -609,12 +609,10 @@ class TranscriptAnalyzer:
         """Use Claude to pick the best matching Linear issue/project from candidates.
 
         Returns the best match dict, or None if Claude says NONE match.
-        Falls back to the first candidate on failure.
+        Returns None on failure (safer to create a new ticket than match wrongly).
         """
         if not candidates:
             return None
-        if len(candidates) == 1:
-            return candidates[0]
 
         # Build a concise prompt for Claude
         candidate_lines = []
@@ -631,7 +629,10 @@ class TranscriptAnalyzer:
             f"Title: {feedback_title}\n"
             f"Description: {feedback_description}\n\n"
             f"Which of these Linear items is the best match? "
-            f"Reply with ONLY the number (e.g. '1') or 'NONE' if none match.\n\n"
+            f"The match must be about the SAME specific product, tool, or feature. "
+            f"Reply with ONLY the number (e.g. '1') or 'NONE' if none match.\n"
+            f"IMPORTANT: Different products/tools are NOT a match even if they "
+            f"are in the same category (e.g. RAMP ≠ BREX, Slack ≠ Teams).\n\n"
             f"{candidates_text}"
         )
 
@@ -651,9 +652,9 @@ class TranscriptAnalyzer:
                 if 0 <= idx < len(candidates):
                     return candidates[idx]
         except Exception:
-            logger.warning("pick_best_match failed, falling back to first candidate")
+            logger.warning("pick_best_match failed, returning None (no match)")
 
-        return candidates[0]
+        return None
 
     @staticmethod
     def _build_user_message(
