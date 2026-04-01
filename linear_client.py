@@ -232,23 +232,53 @@ def _extract_search_terms(feedback_title: str) -> str:
     return title.strip()
 
 
+def _soundex(name: str) -> str:
+    """Soundex phonetic encoding for fuzzy name matching.
+
+    Maps phonetically similar names to the same code:
+    Seed → S300, Siit → S300 (match), Seeder → S360 (no match).
+    """
+    if not name:
+        return ""
+    name = name.upper()
+    first = name[0]
+    codes = {
+        "B": "1", "F": "1", "P": "1", "V": "1",
+        "C": "2", "G": "2", "J": "2", "K": "2",
+        "Q": "2", "S": "2", "X": "2", "Z": "2",
+        "D": "3", "T": "3",
+        "L": "4",
+        "M": "5", "N": "5",
+        "R": "6",
+    }
+    coded = [first]
+    prev = codes.get(first, "0")
+    for ch in name[1:]:
+        code = codes.get(ch, "0")
+        if code != "0" and code != prev:
+            coded.append(code)
+        prev = code if code != "0" else prev
+    return ("".join(coded) + "0000")[:4]
+
+
 def _filter_by_title_relevance(
     candidates: list[dict], search_terms: str
 ) -> list[dict]:
-    """Keep only candidates whose title contains a significant search term.
+    """Keep only candidates whose title contains a search term as a standalone word.
 
     Linear's searchIssues uses semantic matching that often returns unrelated
     results (e.g. "RAMP" → "Akuiteo Integration"). This filter ensures at
-    least one keyword from the search terms appears in the candidate title.
+    least one keyword from the search terms appears as a standalone
+    whitespace-separated word in the candidate title.
     """
     if not search_terms:
         return candidates
-    terms = [t for t in search_terms.lower().split() if len(t) >= 3]
+    terms = {t for t in search_terms.lower().split() if len(t) >= 3}
     if not terms:
         return candidates
     return [
         c for c in candidates
-        if any(term in c.get("title", "").lower() for term in terms)
+        if terms & {w.strip(".,;:!?()[]{}") for w in c.get("title", "").lower().split()}
     ]
 
 
@@ -434,10 +464,57 @@ class LinearClient:
         # Tier 3: containsIgnoreCase filter on key terms
         if key_terms:
             results = self.find_issues_by_title(key_terms, limit=5)
+            results = _filter_by_title_relevance(results, key_terms)
+            if results:
+                return results
+
+        # Tier 4: Fuzzy match against known integration ticket titles
+        # Handles transcription errors (e.g. "Seed" → "Siit")
+        if key_terms:
+            results = self._fuzzy_match_issues(key_terms)
             if results:
                 return results
 
         return []
+
+    def _fuzzy_match_issues(self, term: str) -> list[dict]:
+        """Fuzzy match a term against integration ticket titles using phonetic matching.
+
+        Uses Soundex to find phonetically similar names when exact search
+        fails (e.g. transcript says "Seed" but the ticket is "Siit").
+        Only searches integration-labeled issues to avoid false matches.
+        """
+        issues = self.fetch_issues_summary()
+        if not issues:
+            return []
+
+        term_soundex = _soundex(term)
+        if not term_soundex:
+            return []
+
+        results = []
+        for issue in issues:
+            # Only match against integration-labeled issues
+            labels = [l["name"].lower() for l in issue.get("labels", {}).get("nodes", [])]
+            if not any("integration" in l for l in labels):
+                continue
+
+            title = issue.get("title", "")
+            cleaned = _extract_search_terms(title)
+            if not cleaned or len(cleaned) < 2:
+                continue
+
+            # Compare Soundex codes for each word in the cleaned title
+            for word in cleaned.split():
+                if len(word) >= 2 and _soundex(word) == term_soundex:
+                    logger.info(
+                        f"Phonetic match: '{term}' ≈ '{cleaned}' "
+                        f"(Soundex {term_soundex}) → {issue.get('identifier')}"
+                    )
+                    results.append(issue)
+                    break
+
+        return results
 
     def find_matching_project(self, feedback_title: str) -> list[dict]:
         """Find projects whose name relates to the feedback title.

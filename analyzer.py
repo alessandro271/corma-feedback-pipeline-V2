@@ -122,7 +122,15 @@ built, in development, or planned in Linear, as well as existing integrations fr
 the product catalogue. Use this to better filter out feedback about existing \
 capabilities. If the context shows a feature or integration already exists or is in \
 progress, do NOT include customer requests for that feature as feedback items unless \
-the customer is specifically requesting something beyond what's already described.\
+the customer is specifically requesting something beyond what's already described.
+
+IMPORTANT: Call transcripts often contain misspelled or phonetically transcribed \
+product/tool names (e.g. "Seed" instead of "Siit", "Bamboo Age R" instead of \
+"BambooHR"). When you encounter a product or integration name that does not match \
+any known tool, cross-reference it against the EXISTING PRODUCT CONTEXT list. If a \
+name in the context sounds similar to what was said in the call, use the CORRECT \
+name from the context in your output (e.g. title: "Integration with Siit", not \
+"Integration with Seed").\
 """
 
 CALL_ANALYSIS_SCHEMA = {
@@ -692,10 +700,10 @@ PRE-EXTRACTED FEEDBACK (from Leexi AI):
 EXISTING PRODUCT CONTEXT (from internal systems):
 {product_context}
 
-IMPORTANT: Use the above context to filter out feedback about features or \
-integrations that already exist or are already being built. Only include feedback \
-about capabilities that are NOT listed above, unless the customer is requesting \
-something specifically beyond what's described.
+IMPORTANT: Use the above context to:
+1. Filter out feedback about features/integrations that already exist or are being built.
+2. Correct misspelled or phonetically transcribed product names from the transcript — \
+use the exact name from the context when a transcript term sounds similar to a known product.
 
 """
 
